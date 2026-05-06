@@ -248,7 +248,7 @@
 
 <div class="stats">
   <div class="stat">
-    <div class="stat-number">6</div>
+    <div class="stat-number">5</div>
     <div class="stat-label">Active Grants</div>
   </div>
   <div class="stat">
@@ -318,20 +318,6 @@
 
   <div class="project-row">
     <div class="project-info">
-      <div class="project-name">The Compass</div>
-      <div class="project-funder">Create SA — Collaboration</div>
-      <span class="status-badge status-drafting">Drafting</span>
-    </div>
-    <div class="timeline-area">
-      <div class="bar-row">
-        <div class="bar-outer"><div class="bar-fill bar-compass" id="bar-compass">The Compass</div></div>
-        <div class="countdown" id="cd-compass"></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="project-row">
-    <div class="project-info">
       <div class="project-name">Journey Together</div>
       <div class="project-funder">Foundation Australia-China Relations</div>
       <span class="status-badge status-active">Active — EOI 26 May</span>
@@ -340,6 +326,20 @@
       <div class="bar-row">
         <div class="bar-outer"><div class="bar-fill bar-bamboo" id="bar-bamboo">Journey Together</div></div>
         <div class="countdown" id="cd-bamboo"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="project-row">
+    <div class="project-info">
+      <div class="project-name">The Compass</div>
+      <div class="project-funder">Create SA — Collaboration</div>
+      <span class="status-badge status-drafting">Drafting</span>
+    </div>
+    <div class="timeline-area">
+      <div class="bar-row">
+        <div class="bar-outer"><div class="bar-fill bar-compass" id="bar-compass">The Compass</div></div>
+        <div class="countdown" id="cd-compass"></div>
       </div>
     </div>
   </div>
@@ -357,34 +357,11 @@
       </div>
     </div>
   </div>
-
-  <div class="project-row">
-    <div class="project-info">
-      <div class="project-name">Phap Hoa Lion Dancing</div>
-      <div class="project-funder">Create SA — Community Program</div>
-      <span class="status-badge status-paused">Not Started</span>
-    </div>
-    <div class="timeline-area">
-      <div class="bar-row">
-        <div class="bar-outer"><div class="bar-fill bar-lion" id="bar-lion">Lion Dancing</div></div>
-        <div class="countdown" id="cd-lion"></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div class="section-title" style="margin-top:28px">Next Actions</div>
 
 <div class="next-actions">
-  <div class="action-card">
-    <div class="action-project">The Compass</div>
-    <div class="action-text">Confirm Jascha Boyce + Darcy Grant roles. Producer meeting with Jascha. Draft 2000-word Project Detail and Rationale.</div>
-    <div class="people">
-      <span class="person">Jascha Boyce</span>
-      <span class="person">Darcy Grant</span>
-      <span class="person">Zoe Scroggins</span>
-    </div>
-  </div>
   <div class="action-card">
     <div class="action-project">Journey Together — FACR ⚠ EOI 26 May</div>
     <div class="action-text">Submit 500-word EOI pitch by 26 May (12 noon). Two-stage: EOI → full application 10 July if invited. <em>Borderless Bamboo</em> already submitted to Creative Australia ($30k, awaiting outcome).</div>
@@ -393,6 +370,15 @@
       <span class="person">Hugh Cho</span>
       <span class="person">Paul Tam</span>
       <span class="person">Joon-Yee Kwok</span>
+    </div>
+  </div>
+  <div class="action-card">
+    <div class="action-project">The Compass</div>
+    <div class="action-text">Confirm Jascha Boyce + Darcy Grant roles. Producer meeting with Jascha. Draft 2000-word Project Detail and Rationale.</div>
+    <div class="people">
+      <span class="person">Jascha Boyce</span>
+      <span class="person">Darcy Grant</span>
+      <span class="person">Zoe Scroggins</span>
     </div>
   </div>
   <div class="action-card" style="border-color:#3a2020;background:#150d0d;">
@@ -409,14 +395,6 @@
     <div class="action-project">Schools OSHC</div>
     <div class="action-text">Brief Claude on project details to begin working document and application draft.</div>
     <div class="people"><span class="person">Joshua Hoare</span></div>
-  </div>
-  <div class="action-card">
-    <div class="action-project">Phap Hoa Lion Dancing</div>
-    <div class="action-text">Brief Claude on project details to begin working document and application draft.</div>
-    <div class="people">
-      <span class="person">Joshua Hoare</span>
-      <span class="person">Phap Hoa troupe</span>
-    </div>
   </div>
 </div>
 
@@ -467,7 +445,7 @@
     }
   });
 
-  ['compass','oshc','lion'].forEach(id => {
+  ['compass','oshc'].forEach(id => {
     document.getElementById('bar-' + id).style.width = pct + '%';
     const cd = document.getElementById('cd-' + id);
     cd.innerHTML = '<span class="days">' + leftWork + '</span> working days';
