@@ -212,6 +212,58 @@
     padding: 2px 7px;
     border-radius: 4px;
   }
+
+  .solo-grid {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .solo-card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .solo-card-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+  }
+
+  .solo-card-url {
+    font-size: 0.72rem;
+    color: #555;
+  }
+
+  .solo-card-url a { color: #555; }
+  .solo-card-url a:hover { color: #f0c040; }
+
+  .solo-card-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-top: 4px;
+  }
+
+  .solo-tag {
+    font-size: 0.62rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .solo-tag-live    { background: #1a3a1a; color: #4caf50; }
+  .solo-tag-pending { background: #3a3a1a; color: #f0c040; }
+  .solo-tag-todo    { background: #2a2a2a; color: #555; }
 </style>
 </head>
 <body>
@@ -290,6 +342,22 @@
         <div class="bar-outer"><div class="bar-fill bar-oshc" id="bar-oshc">Schools OSHC</div></div>
         <div class="countdown" id="cd-oshc"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="section-title" style="margin-top:28px">Solopreneur</div>
+
+<div class="solo-grid">
+  <div class="solo-card">
+    <div class="solo-card-name">Make a Dollar</div>
+    <div class="solo-card-url"><a href="https://joshrhoare1.github.io/how-to-say/" target="_blank">joshrhoare1.github.io/how-to-say/</a></div>
+    <div class="solo-card-status">
+      <span class="solo-tag solo-tag-live">Site Live</span>
+      <span class="solo-tag solo-tag-live">italki Affiliate</span>
+      <span class="solo-tag solo-tag-live">Preply Affiliate</span>
+      <span class="solo-tag solo-tag-pending">AdSense — Pending</span>
+      <span class="solo-tag solo-tag-todo">Traffic — To Do</span>
     </div>
   </div>
 </div>
