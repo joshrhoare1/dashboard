@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Studio Table</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden;
+      height: 100vh;
+      background: #f5f3ee;
+    }
+
+    /* ── Toolbar ── */
+
+    #toolbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      background: white;
+      border-bottom: 1px solid #e5e2dc;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      z-index: 9999;
+    }
+
+    #toolbar-title {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #bbb;
+      margin-right: auto;
+    }
+
+    #today-label { font-size: 11px; color: #aaa; }
+
+    .tbtn {
+      padding: 5px 14px;
+      font-size: 12px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      background: white;
+      color: #444;
+      cursor: pointer;
+    }
+    .tbtn:hover { background: #f5f5f5; }
+    .tbtn.primary { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+    .tbtn.primary:hover { background: #333; }
+    .tbtn.danger { color: #e55; border-color: #fcc; }
+    .tbtn.danger:hover { background: #fff5f5; }
+
+    /* ── Canvas ── */
+
+    #wrap {
+      position: fixed;
+      top: 48px; left: 0; right: 0; bottom: 0;
+      overflow: auto;
+    }
+
+    #canvas {
+      width: 4000px;
+      height: 3000px;
+      position: relative;
+      background-color: #f5f3ee;
+      background-image: radial-gradient(circle, #c8c4bb 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+
+    /* ── Timer ── */
+
+    .timer {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      cursor: grab;
+      user-select: none;
+    }
+
+    .timer.dragging { cursor: grabbing; }
+
+    .timer-ring-wrap {
+      position: relative;
+    }
+
+    .timer-ring-wrap svg {
+      display: block;
+      filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10));
+      transition: filter 0.15s, transform 0.12s;
+    }
+
+    .timer:hover .timer-ring-wrap svg {
+      filter: drop-shadow(0 6px 18px rgba(0,0,0,0.16));
+      transform: translateY(-2px);
+    }
+
+    .timer.dragging .timer-ring-wrap svg {
+      filter: drop-shadow(0 14px 32px rgba(0,0,0,0.20));
+      transform: translateY(-4px) rotate(0.6deg);
+    }
+
+    .timer.is-hold { opacity: 0.45; }
+
+    .arc-progress {
+      fill: none;
+      stroke-width: 10;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1),
+                  stroke 0.4s ease;
+    }
+
+    .del-btn {
+      position: absolute;
+      top: 3px; right: 3px;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: #f0ede8;
+      border: none;
+      font-size: 14px;
+      color: #bbb;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.1s;
+      line-height: 1;
+      z-index: 2;
+    }
+    .timer:hover .del-btn { opacity: 1; }
+    .del-btn:hover { color: #e55; background: #fee; }
+
+    .timer-label {
+      margin-top: 9px;
+      text-align: center;
+    }
+
+    .timer-name {
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a1a1a;
+      line-height: 1.35;
+    }
+
+    .timer-date {
+      font-size: 10px;
+      color: #bbb;
+      margin-top: 2px;
+    }
+
+    .timer-amount {
+      font-size: 11px;
+      font-weight: 600;
+      color: #10b981;
+      margin-top: 3px;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Modal ── */
+
+    #modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.25);
+      z-index: 99999;
+      align-items: center;
+      justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+
+    #modal {
+      background: white;
+      border-radius: 10px;
+      padding: 24px;
+      width: 340px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    #modal h2 { font-size: 14px; font-weight: 600; margin-bottom: 18px; color: #1a1a1a; }
+
+    .field { margin-bottom: 14px; }
+
+    .field label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #999;
+      margin-bottom: 5px;
+    }
+
+    .field input, .field select {
+      width: 100%;
+      padding: 8px 10px;
+      font-size: 13px;
+      border: 1px solid #e0ddd8;
+      border-radius: 6px;
+      outline: none;
+      color: #1a1a1a;
+      background: white;
+    }
+    .field input:focus, .field select:focus { border-color: #aaa; }
+
+    .field-row { display: flex; gap: 10px; }
+    .field-row .field { flex: 1; margin-bottom: 0; }
+
+    .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+    .modal-actions .tbtn { flex: 1; text-align: center; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span id="toolbar-title">Studio Table</span>
+  <span id="today-label"></span>
+  <button class="tbtn primary" onclick="openNewModal()">+ Timer</button>
+  <button class="tbtn" onclick="resetDefaults()">Reset</button>
+</div>
+
+<div id="wrap">
+  <div id="canvas"></div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">New Timer</h2>
+    <div class="field">
+      <label>Name</label>
+      <input id="f-name" type="text" placeholder="Project or event name">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Deadline</label>
+        <input id="f-deadline" type="date">
+      </div>
+      <div class="field">
+        <label>Start date</label>
+        <input id="f-start" type="date">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Amount ($)</label>
+        <input id="f-amount" type="number" min="0" step="1000" placeholder="e.g. 100000">
+      </div>
+      <div class="field">
+        <label>Status</label>
+        <select id="f-status">
+          <option value="active">Active</option>
+          <option value="submitted">Submitted</option>
+          <option value="hold">On hold</option>
+        </select>
+      </div>
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="f-type">
+        <option value="grant">Grant Application</option>
+        <option value="world">World / Project</option>
+        <option value="agent">Agent / Tool</option>
+        <option value="person">Person</option>
+        <option value="idea">Idea</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="tbtn" onclick="closeModal()">Cancel</button>
+      <button class="tbtn danger" id="modal-delete-btn" onclick="deleteFromModal()" style="display:none">Delete</button>
+      <button class="tbtn primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ─────────────────────────────────────────
+   Constants
+───────────────────────────────────────── */
+
+const VIEWBOX = 150;  // fixed SVG internal coordinate space
+const R       = 58;   // arc radius in viewBox units
+const C       = 2 * Math.PI * R; // ≈ 364.42
+
+const TYPE_COLORS = {
+  grant: '#8b5cf6',
+  world: '#3b82f6',
+  agent: '#10b981',
+  person:'#f59e0b',
+  idea:  '#f43f5e',
+};
+
+// Dollar amount → rendered SVG pixel size
+function amountToSize(amount, status) {
+  if (status === 'hold' && (!amount || amount <= 0)) return 100;
+  if (!amount || amount <= 0) return 130;
+  const minAmt = 10000, maxAmt = 200000;
+  const minPx  = 105,   maxPx  = 205;
+  const clamped = Math.max(minAmt, Math.min(maxAmt, amount));
+  return Math.round(minPx + (clamped - minAmt) / (maxAmt - minAmt) * (maxPx - minPx));
+}
+
+const DEFAULTS = [
+  // Grants — all due 29 Jun 2026
+  { id:1, name:'The Compass',           deadline:'2026-06-29', startDate:'2026-03-15', type:'grant', amount:100000, status:'active',    x:60,  y:70  },
+  { id:2, name:'Borderless Bamboo',        deadline:'2026-03-15', startDate:'2026-01-15', type:'grant', amount:30000,  status:'submitted',  x:300, y:110 },
+  { id:7, name:'FACR',                     deadline:'2026-05-26', startDate:'2026-01-01', type:'grant', amount:200000, status:'active',     x:730, y:50  },
+  { id:3, name:'Schools OSHC',          deadline:'2026-06-29', startDate:'2026-04-15', type:'grant', amount:15000,  status:'active',     x:440, y:120 },
+  { id:4, name:'Phap Hoa Lion Dancing', deadline:'2026-06-29', startDate:'2026-04-15', type:'grant', amount:0,      status:'hold',       x:580, y:124 },
+  // Other projects
+  { id:5, name:'Seal Tongue',           deadline:'2026-05-08', startDate:'2026-02-01', type:'world', amount:100000, status:'submitted',  x:60,  y:330 },
+  { id:6, name:'Language App / TSE',    deadline:'2026-12-31', startDate:'2026-01-01', type:'world', amount:0,      status:'active',     x:280, y:370 },
+];
+
+/* ─────────────────────────────────────────
+   State
+───────────────────────────────────────── */
+
+let items   = [];
+let nextId  = 20;
+let maxZ    = 10;
+let dragging= null;
+let dragOffX= 0, dragOffY = 0;
+let modalId = null;
+
+const canvas = document.getElementById('canvas');
+const wrap   = document.getElementById('wrap');
+
+/* ─────────────────────────────────────────
+   Date helpers
+───────────────────────────────────────── */
+
+function today() {
+  const d = new Date(); d.setHours(0,0,0,0); return d;
+}
+
+function parseDate(str) {
+  if (!str) return null;
+  const d = new Date(str + 'T00:00:00'); d.setHours(0,0,0,0); return d;
+}
+
+function daysLeft(deadlineStr) {
+  if (!deadlineStr) return null;
+  return Math.round((parseDate(deadlineStr) - today()) / 86400000);
+}
+
+function arcFraction(startStr, deadlineStr) {
+  const s = parseDate(startStr) || today();
+  const e = parseDate(deadlineStr);
+  if (!e) return 1;
+  const total     = (e - s) / 86400000;
+  const remaining = (e - today()) / 86400000;
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(1, remaining / total));
+}
+
+function urgencyColor(days, type) {
+  if (days === null) return TYPE_COLORS[type] || '#3b82f6';
+  if (days < 0)      return '#9ca3af';
+  if (days < 7)      return '#ef4444';
+  if (days < 14)     return '#f97316';
+  if (days < 30)     return '#f59e0b';
+  if (days < 60)     return '#10b981';
+  return TYPE_COLORS[type] || '#3b82f6';
+}
+
+function fmtDeadline(str) {
+  if (!str) return '';
+  return 'Due ' + parseDate(str).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+}
+
+function fmtSubmitted(str) {
+  if (!str) return 'Submitted';
+  return 'Submitted ' + parseDate(str).toLocaleDateString('en-AU', { month:'short', year:'numeric' });
+}
+
+function fmtAmount(n) {
+  if (!n || n <= 0) return '';
+  if (n >= 1000000) return '$' + (n/1000000).toFixed(1).replace(/\.0$/,'') + 'm';
+  if (n >= 1000)    return '$' + Math.round(n/1000) + 'k';
+  return '$' + n;
+}
+
+function isoToday() { return new Date().toISOString().slice(0,10); }
+
+/* ─────────────────────────────────────────
+   Storage
+───────────────────────────────────────── */
+
+function save() {
+  localStorage.setItem('studioTable_v7', JSON.stringify({ items, nextId }));
+}
+
+function load() {
+  const raw = localStorage.getItem('studioTable_v7');
+  if (raw) {
+    const d = JSON.parse(raw);
+    items  = d.items;
+    nextId = d.nextId || 50;
+  } else {
+    items = DEFAULTS.map(i => ({ ...i, z:1 }));
+  }
+}
+
+function resetDefaults() {
+  if (!confirm('Reset to defaults? All custom timers will be removed.')) return;
+  ['studioTable_v3','studioTable_v4','studioTable_v7'].forEach(k => localStorage.removeItem(k));
+  canvas.innerHTML = '';
+  items  = DEFAULTS.map(i => ({ ...i, z:1 }));
+  nextId = 20; maxZ = 10;
+  items.forEach(renderTimer);
+  save();
+}
+
+/* ─────────────────────────────────────────
+   Render
+───────────────────────────────────────── */
+
+function renderTimer(item) {
+  const size    = amountToSize(item.amount, item.status);
+  const scale   = size / VIEWBOX; // used to scale font sizes if needed
+
+  // Determine what to show in the ring center
+  let centerBig, centerSub, arcFrac, arcColor, trackColor;
+
+  if (item.status === 'submitted') {
+    centerBig  = '✓';
+    centerSub  = 'submitted';
+    arcFrac    = 1;
+    arcColor   = '#10b981';
+    trackColor = '#d1fae5';
+  } else if (item.status === 'hold') {
+    centerBig  = '—';
+    centerSub  = 'on hold';
+    arcFrac    = 0;
+    arcColor   = '#d1d5db';
+    trackColor = '#f3f4f6';
+  } else {
+    const days   = daysLeft(item.deadline);
+    const frac   = arcFraction(item.startDate, item.deadline);
+    arcColor     = urgencyColor(days, item.type);
+    arcFrac      = frac;
+    trackColor   = '#ede9e2';
+    centerBig    = days === null ? '–'
+                 : days < 0    ? `+${Math.abs(days)}`
+                 :               String(days);
+    centerSub    = days === null ? 'open'
+                 : days < 0    ? 'overdue'
+                 : days === 1  ? 'day'
+                 :               'days';
+  }
+
+  const offset      = (C * (1 - arcFrac)).toFixed(2);
+  const bigFontSize = centerBig.length >= 3 ? 28 : 36;
+
+  const el = document.createElement('div');
+  el.className  = 'timer' + (item.status === 'hold' ? ' is-hold' : '');
+  el.dataset.id = item.id;
+  el.style.left   = item.x + 'px';
+  el.style.top    = item.y + 'px';
+  el.style.zIndex = item.z || 1;
+  el.style.width  = Math.max(size, 150) + 'px';
+
+  el.innerHTML = `
+    <div class="timer-ring-wrap" style="width:${size}px;height:${size}px">
+      <svg viewBox="0 0 150 150" width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
+        <!-- white face -->
+        <circle cx="75" cy="75" r="70" fill="white"/>
+        <!-- grey track -->
+        <circle cx="75" cy="75" r="${R}" fill="none" stroke="${trackColor}" stroke-width="10"/>
+        <!-- coloured arc, starts at 12 o'clock -->
+        <circle class="arc-progress"
+          cx="75" cy="75" r="${R}"
+          stroke="${arcColor}"
+          stroke-dasharray="${C.toFixed(2)}"
+          stroke-dashoffset="${C.toFixed(2)}"
+          transform="rotate(-90 75 75)"
+          data-target="${offset}"/>
+        <!-- centre: big number/symbol -->
+        <text x="75" y="69"
+          dominant-baseline="middle" text-anchor="middle"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="${bigFontSize}" font-weight="700"
+          fill="${arcColor}">${centerBig}</text>
+        <!-- centre: unit label -->
+        <text x="75" y="91"
+          dominant-baseline="middle" text-anchor="middle"
+          font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-size="11" font-weight="400"
+          fill="#bbb" letter-spacing="0.04em">${centerSub}</text>
+      </svg>
+      <button class="del-btn" title="Delete">×</button>
+    </div>
+    <div class="timer-label" style="max-width:${Math.max(size, 150)}px">
+      <div class="timer-name">${escHtml(item.name)}</div>
+      <div class="timer-date">${item.status === 'submitted' ? fmtSubmitted(item.deadline) : fmtDeadline(item.deadline)}</div>
+      ${item.amount > 0 ? `<div class="timer-amount">${fmtAmount(item.amount)}</div>` : ''}
+    </div>
+  `;
+
+  // Drag
+  el.addEventListener('mousedown', e => {
+    if (e.target.classList.contains('del-btn')) return;
+    dragging     = el;
+    item.z       = ++maxZ;
+    el.style.zIndex = maxZ;
+    el.classList.add('dragging');
+    const rect   = el.getBoundingClientRect();
+    dragOffX     = e.clientX - rect.left;
+    dragOffY     = e.clientY - rect.top;
+    e.preventDefault();
+  });
+
+  // Edit on double-click
+  el.addEventListener('dblclick', e => {
+    if (e.target.classList.contains('del-btn')) return;
+    openEditModal(item);
+  });
+
+  // Delete
+  el.querySelector('.del-btn').addEventListener('mousedown', e => {
+    e.stopPropagation();
+    if (confirm(`Delete "${item.name}"?`)) {
+      items = items.filter(i => i.id !== item.id);
+      el.remove();
+      save();
+    }
+  });
+
+  canvas.appendChild(el);
+
+  // Animate arc in after paint
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const arc = el.querySelector('.arc-progress');
+    if (arc) arc.style.strokeDashoffset = arc.dataset.target;
+  }));
+}
+
+/* ─────────────────────────────────────────
+   Drag
+───────────────────────────────────────── */
+
+document.addEventListener('mousemove', e => {
+  if (!dragging) return;
+  const wr = wrap.getBoundingClientRect();
+  const x  = e.clientX - wr.left + wrap.scrollLeft - dragOffX;
+  const y  = e.clientY - wr.top  + wrap.scrollTop  - dragOffY;
+  dragging.style.left = Math.max(0, x) + 'px';
+  dragging.style.top  = Math.max(0, y) + 'px';
+  const id   = parseInt(dragging.dataset.id);
+  const item = items.find(i => i.id === id);
+  if (item) { item.x = Math.max(0, x); item.y = Math.max(0, y); }
+});
+
+document.addEventListener('mouseup', () => {
+  if (!dragging) return;
+  dragging.classList.remove('dragging');
+  dragging = null;
+  save();
+});
+
+/* ─────────────────────────────────────────
+   Modal
+───────────────────────────────────────── */
+
+function openNewModal() {
+  modalId = null;
+  document.getElementById('modal-title').textContent = 'New Timer';
+  document.getElementById('f-name').value     = '';
+  document.getElementById('f-deadline').value = '';
+  document.getElementById('f-start').value    = isoToday();
+  document.getElementById('f-amount').value   = '';
+  document.getElementById('f-status').value   = 'active';
+  document.getElementById('f-type').value     = 'world';
+  document.getElementById('modal-delete-btn').style.display = 'none';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+
+function openEditModal(item) {
+  modalId = item.id;
+  document.getElementById('modal-title').textContent = 'Edit Timer';
+  document.getElementById('f-name').value     = item.name;
+  document.getElementById('f-deadline').value = item.deadline  || '';
+  document.getElementById('f-start').value    = item.startDate || isoToday();
+  document.getElementById('f-amount').value   = item.amount    || '';
+  document.getElementById('f-status').value   = item.status    || 'active';
+  document.getElementById('f-type').value     = item.type      || 'world';
+  document.getElementById('modal-delete-btn').style.display = '';
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  modalId = null;
+}
+
+function saveModal() {
+  const name      = document.getElementById('f-name').value.trim();
+  const deadline  = document.getElementById('f-deadline').value;
+  const startDate = document.getElementById('f-start').value;
+  const amount    = parseInt(document.getElementById('f-amount').value) || 0;
+  const status    = document.getElementById('f-status').value;
+  const type      = document.getElementById('f-type').value;
+
+  if (!name) { document.getElementById('f-name').focus(); return; }
+
+  if (modalId === null) {
+    const cx = wrap.scrollLeft + wrap.clientWidth  / 2 - 90;
+    const cy = wrap.scrollTop  + wrap.clientHeight / 2 - 90;
+    const item = { id: nextId++, name, deadline, startDate, amount, status, type, x: cx, y: cy, z: ++maxZ };
+    items.push(item);
+    renderTimer(item);
+  } else {
+    const item = items.find(i => i.id === modalId);
+    if (item) {
+      Object.assign(item, { name, deadline, startDate, amount, status, type });
+      canvas.querySelector(`[data-id="${item.id}"]`)?.remove();
+      renderTimer(item);
+    }
+  }
+  save();
+  closeModal();
+}
+
+function deleteFromModal() {
+  if (!modalId) return;
+  const item = items.find(i => i.id === modalId);
+  if (!confirm(`Delete "${item?.name}"?`)) return;
+  items = items.filter(i => i.id !== modalId);
+  canvas.querySelector(`[data-id="${modalId}"]`)?.remove();
+  save();
+  closeModal();
+}
+
+document.getElementById('modal-overlay').addEventListener('mousedown', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+
+document.getElementById('modal').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName !== 'SELECT') saveModal();
+  if (e.key === 'Escape') closeModal();
+});
+
+/* ─────────────────────────────────────────
+   Util
+───────────────────────────────────────── */
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ─────────────────────────────────────────
+   Init
+───────────────────────────────────────── */
+
+load();
+document.getElementById('today-label').textContent =
+  new Date().toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+items.forEach(renderTimer);
+</script>
+</body>
+</html>

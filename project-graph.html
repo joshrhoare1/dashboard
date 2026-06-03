@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Project Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.30.2/dist/cytoscape.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      overflow: hidden; height: 100vh;
+      background: #f5f3ee;
+    }
+
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0; height: 48px;
+      background: white; border-bottom: 1px solid #e5e2dc;
+      display: flex; align-items: center; padding: 0 20px; gap: 10px; z-index: 9999;
+    }
+    #toolbar-title {
+      font-size: 12px; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #bbb; margin-right: auto;
+    }
+    #today-label { font-size: 11px; color: #aaa; }
+
+    .tbtn {
+      padding: 5px 14px; font-size: 12px; border-radius: 5px;
+      border: 1px solid #ddd; background: white; color: #444;
+      cursor: pointer; white-space: nowrap;
+    }
+    .tbtn:hover { background: #f5f5f5; }
+    .tbtn.primary { background: #1a1a1a; color: white; border-color: #1a1a1a; }
+    .tbtn.primary:hover { background: #333; }
+    .tbtn.danger { color: #e55; border-color: #fcc; }
+    .tbtn.danger:hover { background: #fff5f5; }
+    .tbtn.active { background: #6366f1; color: white; border-color: #6366f1; }
+
+    #cy {
+      position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
+      background-color: #f5f3ee;
+      background-image: radial-gradient(circle, #c8c4bb 1px, transparent 1px);
+      background-size: 36px 36px;
+    }
+    #cy canvas { background: transparent !important; }
+
+    /* Inspector */
+    #inspector {
+      position: fixed; top: 48px; right: 0; width: 260px; bottom: 0;
+      background: white; border-left: 1px solid #e5e2dc;
+      transform: translateX(100%); transition: transform 0.22s ease;
+      z-index: 100; overflow-y: auto;
+    }
+    #inspector.open { transform: translateX(0); }
+    #inspector-inner { padding: 20px; }
+    #inspector-close {
+      position: absolute; top: 12px; right: 12px;
+      background: none; border: none; font-size: 20px; color: #bbb; cursor: pointer;
+    }
+    #inspector-close:hover { color: #444; }
+    #inspector-badge {
+      display: inline-block; font-size: 10px; font-weight: 700;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 3px 8px; border-radius: 4px; margin-bottom: 10px;
+    }
+    #inspector-name {
+      font-size: 15px; font-weight: 700; color: #1a1a1a;
+      margin-bottom: 12px; line-height: 1.3; padding-right: 24px;
+    }
+    #inspector-meta { font-size: 12px; color: #666; margin-bottom: 8px; line-height: 1.8; }
+    #inspector-meta strong { color: #1a1a1a; font-weight: 600; }
+    .insp-section {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: #bbb; margin: 16px 0 8px;
+    }
+    .conn-item {
+      display: flex; align-items: center; gap: 7px;
+      padding: 5px 0; border-bottom: 1px solid #f0ede8;
+      font-size: 12px; color: #333;
+    }
+    .conn-item:last-child { border-bottom: none; }
+    .conn-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .conn-rel { margin-left: auto; font-size: 10px; color: #bbb; font-style: italic; }
+    .inspector-actions {
+      display: flex; gap: 8px; margin-top: 20px;
+      padding-top: 16px; border-top: 1px solid #f0ede8;
+    }
+    .inspector-actions .tbtn { flex: 1; text-align: center; }
+
+    /* Legend */
+    #legend {
+      position: fixed; bottom: 20px; left: 20px;
+      background: white; border: 1px solid #e5e2dc; border-radius: 8px;
+      padding: 12px 16px; font-size: 11px; color: #666; z-index: 100;
+    }
+    .leg { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .leg:last-child { margin-bottom: 0; }
+    .leg-circle { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .leg-rect { width: 13px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .leg-diamond { width: 9px; height: 9px; transform: rotate(45deg); flex-shrink: 0; }
+    .leg-divider { border-top: 1px solid #f0ede8; margin: 6px 0; }
+
+    /* Edge hint */
+    #edge-hint {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: #6366f1; color: white; padding: 8px 20px; border-radius: 20px;
+      font-size: 12px; font-weight: 600; display: none; z-index: 200; pointer-events: none;
+    }
+    #edge-hint.visible { display: block; }
+
+    /* Modal */
+    #modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.25); z-index: 99999;
+      align-items: center; justify-content: center;
+    }
+    #modal-overlay.open { display: flex; }
+    #modal {
+      background: white; border-radius: 10px; padding: 24px; width: 360px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    #modal h2 { font-size: 14px; font-weight: 600; margin-bottom: 18px; color: #1a1a1a; }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 11px; font-weight: 600;
+      letter-spacing: 0.06em; text-transform: uppercase; color: #999; margin-bottom: 5px;
+    }
+    .field input, .field select, .field textarea {
+      width: 100%; padding: 8px 10px; font-size: 13px;
+      border: 1px solid #e0ddd8; border-radius: 6px; outline: none;
+      color: #1a1a1a; background: white; font-family: inherit;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color: #aaa; }
+    .field textarea { resize: vertical; min-height: 56px; }
+    .field-row { display: flex; gap: 10px; }
+    .field-row .field { flex: 1; margin-bottom: 0; }
+    .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
+    .modal-actions .tbtn { flex: 1; text-align: center; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span id="toolbar-title">Project Graph</span>
+  <span id="today-label"></span>
+  <button class="tbtn" id="btn-edge" onclick="toggleEdgeMode()" title="Click two nodes to connect them">+ Edge</button>
+  <button class="tbtn" onclick="autoArrange()" title="Auto-place nodes into zones">Arrange</button>
+  <button class="tbtn" onclick="cy.fit(undefined, 50)">Fit</button>
+  <button class="tbtn" onclick="resetGraph()">Reset</button>
+  <button class="tbtn primary" onclick="openNewNodeModal()">+ Node</button>
+</div>
+
+<div id="cy"></div>
+
+<div id="inspector">
+  <div id="inspector-inner">
+    <button id="inspector-close" onclick="closeInspector()">×</button>
+    <div id="inspector-badge"></div>
+    <h2 id="inspector-name"></h2>
+    <div id="inspector-meta"></div>
+    <div id="inspector-connections"></div>
+    <div class="inspector-actions">
+      <button class="tbtn" onclick="editSelected()">Edit</button>
+      <button class="tbtn danger" onclick="deleteSelected()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="legend">
+  <div class="leg"><div class="leg-circle" style="background:white;border:2px solid #3b82f6"></div> Project</div>
+  <div class="leg"><div class="leg-circle" style="background:#f59e0b"></div> Person</div>
+  <div class="leg"><div class="leg-rect" style="background:#6366f1"></div> Organisation</div>
+  <div class="leg"><div class="leg-diamond" style="background:#10b981"></div> Funder</div>
+  <div class="leg"><div class="leg-circle" style="background:#f43f5e"></div> Concept</div>
+  <div class="leg-divider"></div>
+  <div class="leg"><div class="leg-rect" style="background:#8b5cf622;border:1.5px solid #8b5cf6;width:13px;height:9px;border-radius:2px"></div> High Leverage</div>
+  <div class="leg"><div class="leg-rect" style="background:#10b98122;border:1.5px solid #10b981;width:13px;height:9px;border-radius:2px"></div> Making Money</div>
+  <div class="leg"><div class="leg-rect" style="background:#f59e0b22;border:1.5px solid #f59e0b;width:13px;height:9px;border-radius:2px"></div> People</div>
+  <div class="leg"><div class="leg-rect" style="background:#f43f5e22;border:1.5px solid #f43f5e;width:13px;height:9px;border-radius:2px"></div> Costing Money</div>
+</div>
+
+<div id="edge-hint">Click source node, then target — Esc to cancel</div>
+
+<div id="modal-overlay">
+  <div id="modal">
+    <h2 id="modal-title">New Node</h2>
+    <div class="field">
+      <label>Name</label>
+      <input id="f-name" type="text" placeholder="Name">
+    </div>
+    <div class="field">
+      <label>Type</label>
+      <select id="f-type" onchange="onTypeChange()">
+        <option value="project">Project</option>
+        <option value="person">Person</option>
+        <option value="org">Organisation</option>
+        <option value="funder">Funder</option>
+        <option value="concept">Concept</option>
+      </select>
+    </div>
+    <div id="project-fields">
+      <div class="field-row">
+        <div class="field"><label>Deadline</label><input id="f-deadline" type="date"></div>
+        <div class="field"><label>Start date</label><input id="f-start" type="date"></div>
+      </div>
+      <div class="field-row">
+        <div class="field"><label>Amount ($)</label><input id="f-amount" type="number" min="0" step="1000" placeholder="e.g. 100000"></div>
+        <div class="field"><label>Status</label>
+          <select id="f-status">
+            <option value="active">Active</option>
+            <option value="submitted">Submitted</option>
+            <option value="hold">On hold</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="field"><label>Notes</label><textarea id="f-notes" placeholder="Optional notes..."></textarea></div>
+    <div class="modal-actions">
+      <button class="tbtn" onclick="closeModal()">Cancel</button>
+      <button class="tbtn danger" id="modal-delete-btn" onclick="deleteFromModal()" style="display:none">Delete</button>
+      <button class="tbtn primary" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── Zone definitions ── */
+
+const ZONES = [
+  { id: 'zone-leverage', label: 'HIGH LEVERAGE', color: '#8b5cf6', border: '#7c3aed', x: 240,  y: 190, w: 462, h: 352 },
+  { id: 'zone-money',    label: 'MAKING MONEY',  color: '#10b981', border: '#059669', x: 726,  y: 190, w: 462, h: 352 },
+  { id: 'zone-people',   label: 'PEOPLE',         color: '#f59e0b', border: '#b45309', x: 240,  y: 566, w: 462, h: 352 },
+  { id: 'zone-costs',    label: 'COSTING MONEY',  color: '#f43f5e', border: '#dc2626', x: 726,  y: 566, w: 462, h: 352 },
+];
+
+/* ── Constants ── */
+
+const STORAGE_KEY = 'projectGraph_v2';
+
+const TYPE_COLORS = {
+  project: '#3b82f6', person: '#f59e0b',
+  org: '#6366f1', funder: '#10b981', concept: '#f43f5e',
+};
+const TYPE_LABELS = {
+  project: 'Project', person: 'Person',
+  org: 'Organisation', funder: 'Funder', concept: 'Concept',
+};
+const EDGE_COLORS = {
+  leads: '#6b7280', produces: '#9ca3af',
+  creates: '#6366f1', builds: '#6366f1',
+  collaborates: '#3b82f6', partners: '#8b5cf6',
+  applies: '#f59e0b', influences: '#f43f5e',
+  default: '#c4bfb8',
+};
+
+/* ── Default node & edge data ── */
+
+const DEFAULT_NODES = [
+  { id: 'joshua',     label: 'Joshua Hoare',              type: 'person',  subtype: 'self', notes: 'Artistic Director, SACC / Cirkidz' },
+  { id: 'sacc',       label: 'SACC / Cirkidz',            type: 'org',     notes: 'South Australian Circus Centre' },
+  { id: 'compass',    label: 'The Compass',               type: 'project', deadline: '2026-06-29', startDate: '2026-03-15', amount: 100000, status: 'active',    notes: 'Create SA Collaboration. Sand stage + projection mapping.' },
+  { id: 'borderless', label: 'Borderless Bamboo',         type: 'project', deadline: '2026-06-29', startDate: '2026-01-15', amount: 30000,  status: 'active',    notes: 'SACC + TS Crew HK bilateral circus partnership.' },
+  { id: 'oshc',       label: 'Schools OSHC',              type: 'project', deadline: '2026-06-29', startDate: '2026-04-15', amount: 15000,  status: 'active',    notes: 'Create SA Market Development. New OSHC business model.' },
+  { id: 'phaphoa',    label: 'Phap Hoa Lion Dancing',     type: 'project', deadline: '2026-06-29', startDate: '2026-04-15', amount: 0,      status: 'hold',      notes: 'Create SA Community Program.' },
+  { id: 'seal',       label: 'Seal Tongue',               type: 'project', deadline: '2026-05-08', startDate: '2026-02-01', amount: 100000, status: 'submitted', notes: 'Solo circus-theatre. SPARK application.' },
+  { id: 'langapp',    label: 'Language App',              type: 'project', deadline: null,         startDate: '2026-01-01', amount: 0,      status: 'active',    notes: 'NSM-based Mandarin comprehensible input app.' },
+  { id: 'jascha',     label: 'Jascha Boyce',              type: 'person',  notes: 'Director, Gravity & Other Myths' },
+  { id: 'gom',        label: 'Gravity & Other Myths',     type: 'org',     notes: 'Contemporary circus company, Adelaide' },
+  { id: 'corrugated', label: 'Corrugated Iron',           type: 'org',     notes: 'Darwin — presenting partner, The Compass' },
+  { id: 'ts-crew',    label: 'TS Crew HK',                type: 'org',     notes: 'Hong Kong circus partner, Borderless Bamboo' },
+  { id: 'create-sa',  label: 'Create SA',                 type: 'funder',  notes: 'South Australian arts funding body' },
+  { id: 'facr',       label: 'FACR',                      type: 'funder',  notes: 'Foundation for Australia-China Relations' },
+  { id: 'spark',      label: 'SPARK',                     type: 'funder',  notes: 'Adelaide Festival Centre development fund' },
+];
+
+const DEFAULT_EDGES = [
+  { id: 'e1',  source: 'joshua',     target: 'sacc',       type: 'leads',        label: 'leads' },
+  { id: 'e2',  source: 'sacc',       target: 'compass',    type: 'produces',     label: 'produces' },
+  { id: 'e3',  source: 'sacc',       target: 'borderless', type: 'produces',     label: 'produces' },
+  { id: 'e4',  source: 'sacc',       target: 'oshc',       type: 'produces',     label: 'produces' },
+  { id: 'e5',  source: 'sacc',       target: 'phaphoa',    type: 'produces',     label: 'produces' },
+  { id: 'e6',  source: 'joshua',     target: 'seal',       type: 'creates',      label: 'creates' },
+  { id: 'e7',  source: 'joshua',     target: 'langapp',    type: 'builds',       label: 'builds' },
+  { id: 'e8',  source: 'compass',    target: 'jascha',     type: 'collaborates', label: 'collaborates' },
+  { id: 'e9',  source: 'jascha',     target: 'gom',        type: 'leads',        label: 'leads' },
+  { id: 'e10', source: 'compass',    target: 'gom',        type: 'collaborates', label: 'collaboration' },
+  { id: 'e11', source: 'compass',    target: 'corrugated', type: 'partners',     label: 'presenting partner' },
+  { id: 'e12', source: 'compass',    target: 'create-sa',  type: 'applies',      label: 'applying' },
+  { id: 'e13', source: 'borderless', target: 'ts-crew',    type: 'partners',     label: 'partner org' },
+  { id: 'e14', source: 'borderless', target: 'facr',       type: 'applies',      label: 'applying' },
+  { id: 'e15', source: 'oshc',       target: 'create-sa',  type: 'applies',      label: 'applying' },
+  { id: 'e16', source: 'phaphoa',    target: 'create-sa',  type: 'applies',      label: 'applying' },
+  { id: 'e17', source: 'seal',       target: 'spark',      type: 'applies',      label: 'applying' },
+];
+
+// Initial zone-based positions
+const DEFAULT_POSITIONS = {
+  // High Leverage zone (center 240, 190)
+  sacc:       { x: 185, y: 155 },
+  gom:        { x: 100, y: 245 },
+  corrugated: { x: 315, y: 235 },
+  'ts-crew':  { x: 190, y: 290 },
+  // Making Money zone (center 726, 190)
+  'create-sa':{ x: 590, y: 110 },
+  facr:       { x: 726, y: 110 },
+  spark:      { x: 862, y: 110 },
+  compass:    { x: 590, y: 205 },
+  seal:       { x: 726, y: 200 },
+  borderless: { x: 862, y: 205 },
+  oshc:       { x: 648, y: 295 },
+  langapp:    { x: 804, y: 295 },
+  // People zone (center 240, 566)
+  joshua:     { x: 185, y: 540 },
+  jascha:     { x: 310, y: 625 },
+  // Costing Money zone (center 726, 566)
+  phaphoa:    { x: 726, y: 590 },
+};
+
+/* ── Date helpers ── */
+
+function today() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function parseDate(s) { if (!s) return null; const d = new Date(s+'T00:00:00'); d.setHours(0,0,0,0); return d; }
+function daysLeft(s) { if (!s) return null; return Math.round((parseDate(s) - today()) / 86400000); }
+function arcFrac(start, end) {
+  const s = parseDate(start) || today(), e = parseDate(end);
+  if (!e) return 1;
+  const total = (e - s) / 86400000, rem = (e - today()) / 86400000;
+  return total <= 0 ? 0 : Math.max(0, Math.min(1, rem / total));
+}
+function urgencyColor(days) {
+  if (days === null) return '#3b82f6';
+  if (days < 0)  return '#9ca3af';
+  if (days < 7)  return '#ef4444';
+  if (days < 14) return '#f97316';
+  if (days < 30) return '#f59e0b';
+  if (days < 60) return '#10b981';
+  return '#3b82f6';
+}
+function fmtAmount(n) {
+  if (!n || n <= 0) return '';
+  if (n >= 1000000) return '$'+(n/1000000).toFixed(1).replace(/\.0$/,'')+'m';
+  if (n >= 1000) return '$'+Math.round(n/1000)+'k';
+  return '$'+n;
+}
+function fmtDate(s) {
+  if (!s) return '';
+  return parseDate(s).toLocaleDateString('en-AU', { day:'numeric', month:'short', year:'numeric' });
+}
+function isoToday() { return new Date().toISOString().slice(0,10); }
+
+/* ── Enrich regular nodes ── */
+
+function enrichNode(n) {
+  const d = { ...n };
+  if (n.type === 'project') {
+    const days = daysLeft(n.deadline), frac = arcFrac(n.startDate, n.deadline);
+    if (n.status === 'submitted') {
+      d.nodeColor = 'white'; d.borderColor = '#10b981';
+      d.pie1Color = '#10b981'; d.pie1Size = 100;
+      d.pie2Color = '#d1fae5'; d.pie2Size = 0;
+      d.urgencyColor = '#10b981';
+    } else if (n.status === 'hold') {
+      d.nodeColor = 'white'; d.borderColor = '#d1d5db';
+      d.pie1Color = '#f3f4f6'; d.pie1Size = 0;
+      d.pie2Color = '#e5e7eb'; d.pie2Size = 100;
+      d.urgencyColor = '#d1d5db';
+    } else {
+      const c = urgencyColor(days);
+      d.nodeColor = 'white'; d.borderColor = c;
+      d.pie1Color = c; d.pie1Size = Math.round(frac * 100);
+      d.pie2Color = '#ede9e2'; d.pie2Size = 100 - Math.round(frac * 100);
+      d.urgencyColor = c;
+    }
+    d.nodeWidth  = n.status === 'hold' ? 62 : Math.round(62 + Math.min(n.amount||0, 200000) / 200000 * 34);
+    d.nodeHeight = d.nodeWidth; d.shape = 'ellipse';
+  } else if (n.type === 'person') {
+    const self = n.subtype === 'self';
+    d.nodeColor = self ? '#1a1a1a' : TYPE_COLORS.person;
+    d.borderColor = self ? '#1a1a1a' : '#d97706';
+    d.urgencyColor = d.nodeColor;
+    d.pie1Color = '#00000000'; d.pie1Size = 0;
+    d.pie2Color = '#00000000'; d.pie2Size = 0;
+    d.nodeWidth = self ? 68 : 52; d.nodeHeight = d.nodeWidth; d.shape = 'ellipse';
+  } else if (n.type === 'org') {
+    d.nodeColor = TYPE_COLORS.org; d.borderColor = '#4338ca';
+    d.urgencyColor = TYPE_COLORS.org;
+    d.pie1Color = '#00000000'; d.pie1Size = 0; d.pie2Color = '#00000000'; d.pie2Size = 0;
+    d.nodeWidth = 88; d.nodeHeight = 46; d.shape = 'round-rectangle';
+  } else if (n.type === 'funder') {
+    d.nodeColor = TYPE_COLORS.funder; d.borderColor = '#059669';
+    d.urgencyColor = TYPE_COLORS.funder;
+    d.pie1Color = '#00000000'; d.pie1Size = 0; d.pie2Color = '#00000000'; d.pie2Size = 0;
+    d.nodeWidth = 62; d.nodeHeight = 62; d.shape = 'diamond';
+  } else {
+    d.nodeColor = TYPE_COLORS.concept; d.borderColor = '#e11d48';
+    d.urgencyColor = TYPE_COLORS.concept;
+    d.pie1Color = '#00000000'; d.pie1Size = 0; d.pie2Color = '#00000000'; d.pie2Size = 0;
+    d.nodeWidth = 56; d.nodeHeight = 56; d.shape = 'hexagon';
+  }
+  return d;
+}
+
+/* ── Zone node builder ── */
+
+function makeZoneNode(z) {
+  return {
+    id: z.id, label: z.label, type: 'zone',
+    nodeWidth: z.w, nodeHeight: z.h,
+    nodeColor: z.color, borderColor: z.border,
+    urgencyColor: z.border, shape: 'round-rectangle',
+    pie1Color: '#00000000', pie1Size: 0, pie2Color: '#00000000', pie2Size: 0,
+  };
+}
+
+/* ── State ── */
+
+let graphData = { nodes: [], edges: [], positions: {}, nextId: 100 };
+let cy = null;
+let selectedId = null;
+let modalId = null;
+let edgeMode = false;
+let edgeSrc = null;
+
+/* ── Storage ── */
+
+function save() {
+  if (cy) cy.nodes().forEach(n => {
+    graphData.positions[n.id()] = { x: Math.round(n.position('x')), y: Math.round(n.position('y')) };
+  });
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(graphData));
+}
+
+function load() {
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    try {
+      graphData = JSON.parse(raw);
+      ensureZones();
+      return;
+    } catch(e) {}
+  }
+  graphData = {
+    nodes: [...ZONES.map(makeZoneNode), ...DEFAULT_NODES.map(n => ({...n}))],
+    edges: DEFAULT_EDGES.map(e => ({...e})),
+    positions: { ...DEFAULT_POSITIONS },
+    nextId: 100
+  };
+  ZONES.forEach(z => { graphData.positions[z.id] = { x: z.x, y: z.y }; });
+}
+
+function ensureZones() {
+  ZONES.forEach(z => {
+    if (!graphData.nodes.find(n => n.id === z.id)) {
+      graphData.nodes.unshift(makeZoneNode(z));
+    }
+    if (!graphData.positions[z.id]) {
+      graphData.positions[z.id] = { x: z.x, y: z.y };
+    }
+  });
+}
+
+function resetGraph() {
+  if (!confirm('Reset to defaults? All changes will be lost.')) return;
+  localStorage.removeItem(STORAGE_KEY);
+  load(); closeInspector(); buildCy();
+}
+
+/* ── Build Cytoscape elements ── */
+
+function buildElements() {
+  const nodes = graphData.nodes.map(n => {
+    const d = n.type === 'zone' ? makeZoneNode(ZONES.find(z => z.id === n.id) || {}) : enrichNode(n);
+    // Fallback to original node data if zone not found
+    const data = Object.keys(d).length > 2 ? d : { ...n };
+    const pos = graphData.positions[n.id];
+    return pos ? { data, position: pos } : { data };
+  });
+  const edges = graphData.edges.map(e => ({
+    data: { ...e, edgeColor: EDGE_COLORS[e.type] || EDGE_COLORS.default }
+  }));
+  return [...nodes, ...edges];
+}
+
+/* ── Cytoscape init ── */
+
+function buildCy() {
+  if (cy) { cy.destroy(); cy = null; }
+
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: buildElements(),
+    style: [
+      // Zone nodes
+      {
+        selector: 'node[type="zone"]',
+        style: {
+          'width': 'data(nodeWidth)', 'height': 'data(nodeHeight)',
+          'shape': 'round-rectangle',
+          'background-color': 'data(nodeColor)',
+          'background-opacity': 0.07,
+          'border-color': 'data(borderColor)',
+          'border-width': 1.5, 'border-opacity': 0.35,
+          'label': 'data(label)',
+          'text-valign': 'center', 'text-halign': 'left',
+          'text-margin-x': 20,
+          'text-margin-y': -148,
+          'font-size': 10, 'font-weight': 700,
+          'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          'color': 'data(borderColor)',
+          'text-opacity': 0.7,
+          'z-index': 0, 'events': 'no',
+          'text-wrap': 'none',
+        }
+      },
+      // Regular nodes
+      {
+        selector: 'node[type != "zone"]',
+        style: {
+          'width': 'data(nodeWidth)', 'height': 'data(nodeHeight)',
+          'shape': 'data(shape)',
+          'background-color': 'data(nodeColor)',
+          'border-color': 'data(borderColor)', 'border-width': 2.5,
+          'label': 'data(label)',
+          'font-size': 11, 'font-weight': 600,
+          'font-family': '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+          'color': '#333',
+          'text-valign': 'bottom', 'text-halign': 'center',
+          'text-margin-y': 8, 'text-wrap': 'wrap', 'text-max-width': 90,
+          'min-zoomed-font-size': 7, 'z-index': 10,
+        }
+      },
+      // Project nodes: pie chart
+      {
+        selector: 'node[type="project"]',
+        style: {
+          'background-color': 'white',
+          'pie-size': '88%',
+          'pie-1-background-color': 'data(pie1Color)',
+          'pie-1-background-size': 'data(pie1Size)',
+          'pie-2-background-color': 'data(pie2Color)',
+          'pie-2-background-size': 'data(pie2Size)',
+        }
+      },
+      { selector: 'node[type != "zone"]:selected', style: { 'border-width': 4.5, 'border-color': '#1a1a1a', 'z-index': 20 } },
+      { selector: 'node.edge-src', style: { 'border-color': '#6366f1', 'border-width': 5 } },
+      // Edges — ambient by default, reveal on hover
+      {
+        selector: 'edge',
+        style: {
+          'width': 1, 'line-color': '#9ca3af',
+          'target-arrow-shape': 'none',
+          'curve-style': 'bezier',
+          'opacity': 0.12,
+          'transition-property': 'opacity, width',
+          'transition-duration': '150ms',
+        }
+      },
+      {
+        selector: 'edge.lit',
+        style: { 'opacity': 0.65, 'width': 1.5 }
+      },
+      { selector: 'edge:selected', style: { 'opacity': 0.85, 'width': 2, 'line-color': '#6366f1' } },
+    ],
+    layout: { name: 'preset' },
+    userZoomingEnabled: true, userPanningEnabled: true,
+    boxSelectionEnabled: false, selectionType: 'single',
+    minZoom: 0.1, maxZoom: 4,
+  });
+
+  cy.nodes('[type="zone"]').forEach(n => n.lock());
+
+  cy.on('tap', 'node[type != "zone"]', e => {
+    const node = e.target;
+    if (edgeMode) { handleEdgeTap(node); return; }
+    cy.edges().removeClass('lit');
+    node.connectedEdges().addClass('lit');
+    selectedId = node.id();
+    showInspector(node.data());
+  });
+
+  cy.on('tap', e => {
+    if (e.target === cy && !edgeMode) {
+      cy.edges().removeClass('lit');
+      closeInspector(); cy.elements().unselect(); selectedId = null;
+    }
+  });
+
+  cy.on('mouseover', 'node[type != "zone"]', e => {
+    document.getElementById('cy').style.cursor = edgeMode ? 'crosshair' : 'pointer';
+    if (!edgeMode) e.target.connectedEdges().addClass('lit');
+  });
+  cy.on('mouseout', 'node[type != "zone"]', e => {
+    document.getElementById('cy').style.cursor = '';
+    // Keep lit if the node is selected, otherwise dim
+    if (e.target.id() !== selectedId) e.target.connectedEdges().removeClass('lit');
+  });
+
+  cy.on('dragfree', 'node[type != "zone"]', e => {
+    const p = e.target.position();
+    graphData.positions[e.target.id()] = { x: Math.round(p.x), y: Math.round(p.y) };
+    save();
+  });
+
+  cy.fit(undefined, 50);
+}
+
+/* ── Auto-arrange ── */
+
+const ZONE_ASSIGN = {
+  person:  'zone-people',
+  funder:  'zone-money',
+  org:     'zone-leverage',
+  concept: 'zone-leverage',
+};
+
+function assignZone(n) {
+  if (n.type === 'project') {
+    return (n.amount || 0) > 0 && n.status !== 'hold' ? 'zone-money' : 'zone-costs';
+  }
+  return ZONE_ASSIGN[n.type] || 'zone-leverage';
+}
+
+function autoArrange() {
+  const groups = {};
+  ZONES.forEach(z => { groups[z.id] = []; });
+  graphData.nodes.forEach(n => {
+    if (n.type === 'zone') return;
+    groups[assignZone(n)].push(n.id);
+  });
+
+  ZONES.forEach(z => {
+    const ids = groups[z.id];
+    if (!ids || ids.length === 0) return;
+    const cols = Math.max(1, Math.ceil(Math.sqrt(ids.length)));
+    const rows = Math.ceil(ids.length / cols);
+    const padX = 55, padY = 65;
+    const cellW = (z.w - padX * 2) / Math.max(cols, 1);
+    const cellH = (z.h - padY * 2) / Math.max(rows, 1);
+    const startX = z.x - z.w / 2 + padX + cellW / 2;
+    const startY = z.y - z.h / 2 + padY + cellH / 2;
+
+    ids.forEach((id, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      cy.getElementById(id).animate({
+        position: { x: startX + col * cellW, y: startY + row * cellH },
+        duration: 450, easing: 'ease-in-out-quad',
+      });
+    });
+  });
+
+  setTimeout(() => { save(); cy.fit(undefined, 50); }, 550);
+}
+
+/* ── Edge mode ── */
+
+function toggleEdgeMode() {
+  edgeMode = !edgeMode; edgeSrc = null;
+  cy.nodes().removeClass('edge-src');
+  document.getElementById('btn-edge').classList.toggle('active', edgeMode);
+  document.getElementById('edge-hint').classList.toggle('visible', edgeMode);
+  document.getElementById('cy').style.cursor = edgeMode ? 'crosshair' : '';
+  cy.userPanningEnabled(!edgeMode);
+  if (edgeMode) closeInspector();
+}
+
+function handleEdgeTap(node) {
+  if (!edgeSrc) { edgeSrc = node; node.addClass('edge-src'); return; }
+  if (edgeSrc.id() === node.id()) { edgeSrc.removeClass('edge-src'); edgeSrc = null; return; }
+  const src = edgeSrc.id(), tgt = node.id();
+  if (!graphData.edges.some(e => e.source === src && e.target === tgt)) {
+    const id = 'e' + (graphData.nextId++);
+    const edge = { id, source: src, target: tgt, type: 'default', label: '' };
+    graphData.edges.push(edge);
+    cy.add({ data: { ...edge, edgeColor: EDGE_COLORS.default } });
+    save();
+  }
+  edgeSrc.removeClass('edge-src'); edgeSrc = null;
+  toggleEdgeMode();
+}
+
+/* ── Inspector ── */
+
+function showInspector(data) {
+  const color = data.urgencyColor || TYPE_COLORS[data.type] || '#999';
+  const badge = document.getElementById('inspector-badge');
+  badge.textContent = TYPE_LABELS[data.type] || data.type;
+  badge.style.background = color + '22'; badge.style.color = color;
+  document.getElementById('inspector-name').textContent = data.label;
+
+  let meta = '';
+  if (data.type === 'project') {
+    if (data.status === 'submitted') {
+      meta += `<div><strong>Status:</strong> Submitted ✓</div>`;
+    } else if (data.status === 'hold') {
+      meta += `<div><strong>Status:</strong> On hold</div>`;
+    } else {
+      const days = daysLeft(data.deadline);
+      if (days !== null) {
+        const c = urgencyColor(days);
+        meta += `<div><strong style="color:${c}">${days < 0 ? Math.abs(days)+' days overdue' : days+' days remaining'}</strong></div>`;
+      }
+      if (data.deadline) meta += `<div><strong>Deadline:</strong> ${fmtDate(data.deadline)}</div>`;
+    }
+    if (data.amount > 0) meta += `<div><strong>Amount:</strong> ${fmtAmount(data.amount)}</div>`;
+  }
+  if (data.notes) meta += `<div style="margin-top:8px;color:#888;font-size:11px">${escHtml(data.notes)}</div>`;
+  document.getElementById('inspector-meta').innerHTML = meta;
+
+  const nodeEl = cy.getElementById(data.id);
+  const conns = [];
+  nodeEl.connectedEdges().forEach(edge => {
+    const isSrc = edge.data('source') === data.id;
+    const otherId = isSrc ? edge.data('target') : edge.data('source');
+    const other = cy.getElementById(otherId);
+    if (!other.empty() && other.data('type') !== 'zone') {
+      conns.push({
+        label: other.data('label'),
+        color: other.data('urgencyColor') || TYPE_COLORS[other.data('type')] || '#999',
+        rel: (isSrc ? '→ ' : '← ') + (edge.data('label') || edge.data('type') || ''),
+      });
+    }
+  });
+
+  const connHtml = conns.length === 0
+    ? '<div style="color:#bbb;font-size:11px">No connections</div>'
+    : `<div class="insp-section">Connections</div>` + conns.map(c =>
+        `<div class="conn-item"><div class="conn-dot" style="background:${c.color}"></div><span>${escHtml(c.label)}</span><span class="conn-rel">${escHtml(c.rel)}</span></div>`
+      ).join('');
+  document.getElementById('inspector-connections').innerHTML = connHtml;
+  document.getElementById('inspector').classList.add('open');
+}
+
+function closeInspector() {
+  document.getElementById('inspector').classList.remove('open');
+  if (cy) cy.edges().removeClass('lit');
+  selectedId = null;
+}
+
+function editSelected() {
+  if (!selectedId) return;
+  const node = graphData.nodes.find(n => n.id === selectedId);
+  if (node && node.type !== 'zone') openEditModal(node);
+}
+
+function deleteSelected() {
+  if (!selectedId) return;
+  const node = graphData.nodes.find(n => n.id === selectedId);
+  if (!node || node.type === 'zone' || !confirm(`Delete "${node.label}"?`)) return;
+  graphData.nodes = graphData.nodes.filter(n => n.id !== selectedId);
+  graphData.edges = graphData.edges.filter(e => e.source !== selectedId && e.target !== selectedId);
+  cy.getElementById(selectedId).remove();
+  closeInspector(); save();
+}
+
+/* ── Modal ── */
+
+function onTypeChange() {
+  document.getElementById('project-fields').style.display =
+    document.getElementById('f-type').value === 'project' ? '' : 'none';
+}
+
+function openNewNodeModal() {
+  modalId = null;
+  document.getElementById('modal-title').textContent = 'New Node';
+  document.getElementById('f-name').value = '';
+  document.getElementById('f-type').value = 'project';
+  document.getElementById('f-deadline').value = '';
+  document.getElementById('f-start').value = isoToday();
+  document.getElementById('f-amount').value = '';
+  document.getElementById('f-status').value = 'active';
+  document.getElementById('f-notes').value = '';
+  document.getElementById('modal-delete-btn').style.display = 'none';
+  onTypeChange();
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+
+function openEditModal(node) {
+  modalId = node.id;
+  document.getElementById('modal-title').textContent = 'Edit Node';
+  document.getElementById('f-name').value    = node.label;
+  document.getElementById('f-type').value    = node.type;
+  document.getElementById('f-deadline').value = node.deadline  || '';
+  document.getElementById('f-start').value   = node.startDate || isoToday();
+  document.getElementById('f-amount').value  = node.amount    || '';
+  document.getElementById('f-status').value  = node.status    || 'active';
+  document.getElementById('f-notes').value   = node.notes     || '';
+  document.getElementById('modal-delete-btn').style.display = '';
+  onTypeChange();
+  document.getElementById('modal-overlay').classList.add('open');
+  setTimeout(() => document.getElementById('f-name').focus(), 50);
+}
+
+function closeModal() { document.getElementById('modal-overlay').classList.remove('open'); modalId = null; }
+
+function saveModal() {
+  const label    = document.getElementById('f-name').value.trim();
+  const type     = document.getElementById('f-type').value;
+  const deadline = document.getElementById('f-deadline').value || null;
+  const startDate= document.getElementById('f-start').value   || isoToday();
+  const amount   = parseInt(document.getElementById('f-amount').value) || 0;
+  const status   = document.getElementById('f-status').value;
+  const notes    = document.getElementById('f-notes').value.trim();
+
+  if (!label) { document.getElementById('f-name').focus(); return; }
+
+  if (modalId === null) {
+    const id = 'n' + (graphData.nextId++);
+    const node = { id, label, type, deadline, startDate, amount, status, notes };
+    graphData.nodes.push(node);
+    cy.add({ data: enrichNode(node) });
+    const ext = cy.extent();
+    cy.getElementById(id).position({ x: (ext.x1+ext.x2)/2, y: (ext.y1+ext.y2)/2 });
+  } else {
+    const node = graphData.nodes.find(n => n.id === modalId);
+    if (node) {
+      Object.assign(node, { label, type, deadline, startDate, amount, status, notes });
+      cy.getElementById(modalId).data(enrichNode(node));
+      if (selectedId === modalId) showInspector(cy.getElementById(modalId).data());
+    }
+  }
+  save(); closeModal();
+}
+
+function deleteFromModal() {
+  if (!modalId) return;
+  const node = graphData.nodes.find(n => n.id === modalId);
+  if (!confirm(`Delete "${node?.label}"?`)) return;
+  graphData.nodes = graphData.nodes.filter(n => n.id !== modalId);
+  graphData.edges = graphData.edges.filter(e => e.source !== modalId && e.target !== modalId);
+  cy.getElementById(modalId).remove();
+  if (selectedId === modalId) closeInspector();
+  save(); closeModal();
+}
+
+function escHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ── Modal & keyboard events ── */
+
+document.getElementById('modal-overlay').addEventListener('mousedown', e => {
+  if (e.target === document.getElementById('modal-overlay')) closeModal();
+});
+document.getElementById('modal').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.tagName !== 'SELECT' && e.target.tagName !== 'TEXTAREA') saveModal();
+  if (e.key === 'Escape') closeModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && edgeMode) toggleEdgeMode();
+});
+
+/* ── Init ── */
+
+load();
+buildCy();
+document.getElementById('today-label').textContent =
+  new Date().toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+</script>
+</body>
+</html>
