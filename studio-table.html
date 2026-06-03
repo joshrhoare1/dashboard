@@ -594,17 +594,6 @@ document.addEventListener('touchstart', e => {
   const timerEl = e.target.closest('.timer');
   if (timerEl) {
     if (e.target.classList.contains('del-btn')) return;
-    const now = Date.now();
-    if (timerEl === lastTapEl && now - lastTapTime < 300) {
-      lastTapEl = null;
-      const id = parseInt(timerEl.dataset.id);
-      const it = items.find(i => i.id === id);
-      if (it) openEditModal(it);
-      e.preventDefault();
-      return;
-    }
-    lastTapEl = timerEl;
-    lastTapTime = now;
     const t  = e.touches[0];
     dragging = timerEl;
     const id = parseInt(timerEl.dataset.id);
@@ -637,9 +626,23 @@ document.addEventListener('touchmove', e => {
   }
 }, { passive: false });
 
-document.addEventListener('touchend', () => {
-  endDrag();
+document.addEventListener('touchend', e => {
   panning = false;
+  if (!dragging) return;
+  const timerEl = dragging;
+  dragging.classList.remove('dragging');
+  dragging = null;
+  const now = Date.now();
+  if (timerEl === lastTapEl && now - lastTapTime < 500) {
+    lastTapEl = null;
+    const id = parseInt(timerEl.dataset.id);
+    const it = items.find(i => i.id === id);
+    if (it) openEditModal(it);
+    return;
+  }
+  lastTapEl = timerEl;
+  lastTapTime = now;
+  save();
 });
 
 /* ─────────────────────────────────────────
