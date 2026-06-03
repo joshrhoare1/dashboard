@@ -588,11 +588,23 @@ document.addEventListener('mousemove', e => applyDragMove(e.clientX, e.clientY))
 document.addEventListener('mouseup', endDrag);
 
 let panning = false, panStartX = 0, panStartY = 0, panScrollLeft = 0, panScrollTop = 0;
+let lastTapEl = null, lastTapTime = 0;
 
 document.addEventListener('touchstart', e => {
   const timerEl = e.target.closest('.timer');
   if (timerEl) {
     if (e.target.classList.contains('del-btn')) return;
+    const now = Date.now();
+    if (timerEl === lastTapEl && now - lastTapTime < 300) {
+      lastTapEl = null;
+      const id = parseInt(timerEl.dataset.id);
+      const it = items.find(i => i.id === id);
+      if (it) openEditModal(it);
+      e.preventDefault();
+      return;
+    }
+    lastTapEl = timerEl;
+    lastTapTime = now;
     const t  = e.touches[0];
     dragging = timerEl;
     const id = parseInt(timerEl.dataset.id);
