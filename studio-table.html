@@ -69,6 +69,7 @@
       background-color: #f5f3ee;
       background-image: radial-gradient(circle, #c8c4bb 1px, transparent 1px);
       background-size: 36px 36px;
+      touch-action: none;
     }
 
     /* ── Timer ── */
@@ -521,7 +522,7 @@ function renderTimer(item) {
     </div>
   `;
 
-  // Drag
+  // Drag — mouse
   el.addEventListener('mousedown', e => {
     if (e.target.classList.contains('del-btn')) return;
     dragging     = el;
@@ -533,6 +534,20 @@ function renderTimer(item) {
     dragOffY     = e.clientY - rect.top;
     e.preventDefault();
   });
+
+  // Drag — touch
+  el.addEventListener('touchstart', e => {
+    if (e.target.classList.contains('del-btn')) return;
+    const t      = e.touches[0];
+    dragging     = el;
+    item.z       = ++maxZ;
+    el.style.zIndex = maxZ;
+    el.classList.add('dragging');
+    const rect   = el.getBoundingClientRect();
+    dragOffX     = t.clientX - rect.left;
+    dragOffY     = t.clientY - rect.top;
+    e.preventDefault();
+  }, { passive: false });
 
   // Edit on double-click
   el.addEventListener('dblclick', e => {
@@ -563,24 +578,35 @@ function renderTimer(item) {
    Drag
 ───────────────────────────────────────── */
 
-document.addEventListener('mousemove', e => {
+function applyDragMove(clientX, clientY) {
   if (!dragging) return;
   const wr = wrap.getBoundingClientRect();
-  const x  = e.clientX - wr.left + wrap.scrollLeft - dragOffX;
-  const y  = e.clientY - wr.top  + wrap.scrollTop  - dragOffY;
+  const x  = clientX - wr.left + wrap.scrollLeft - dragOffX;
+  const y  = clientY - wr.top  + wrap.scrollTop  - dragOffY;
   dragging.style.left = Math.max(0, x) + 'px';
   dragging.style.top  = Math.max(0, y) + 'px';
   const id   = parseInt(dragging.dataset.id);
   const item = items.find(i => i.id === id);
   if (item) { item.x = Math.max(0, x); item.y = Math.max(0, y); }
-});
+}
 
-document.addEventListener('mouseup', () => {
+function endDrag() {
   if (!dragging) return;
   dragging.classList.remove('dragging');
   dragging = null;
   save();
-});
+}
+
+document.addEventListener('mousemove', e => applyDragMove(e.clientX, e.clientY));
+document.addEventListener('mouseup', endDrag);
+
+document.addEventListener('touchmove', e => {
+  if (!dragging) return;
+  e.preventDefault();
+  applyDragMove(e.touches[0].clientX, e.touches[0].clientY);
+}, { passive: false });
+
+document.addEventListener('touchend', endDrag);
 
 /* ─────────────────────────────────────────
    Modal
