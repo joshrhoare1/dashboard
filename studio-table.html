@@ -601,7 +601,7 @@ let lastTapEl = null, lastTapTime = 0;
 let pinching = false, pinchStartDist = 0, pinchStartScale = 1.0;
 
 document.addEventListener('touchstart', e => {
-  if (e.target.closest('#modal-overlay, #toolbar')) return;
+  if (!e.target.closest('#canvas')) return;
   if (e.touches.length === 2) {
     if (dragging) { dragging.classList.remove('dragging'); dragging = null; }
     panning = false;
@@ -636,6 +636,7 @@ document.addEventListener('touchstart', e => {
 }, { passive: false });
 
 document.addEventListener('touchmove', e => {
+  if (!dragging && !panning && !pinching) return;
   e.preventDefault();
   if (e.touches.length === 2 && pinching) {
     const dist = getTouchDist(e);
