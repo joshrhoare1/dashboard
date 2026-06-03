@@ -61,8 +61,6 @@
       position: fixed;
       top: 48px; left: 0; right: 0; bottom: 0;
       overflow: auto;
-      touch-action: pan-x pan-y;
-      -webkit-overflow-scrolling: touch;
     }
 
     #canvas {
@@ -72,6 +70,7 @@
       background-color: #f5f3ee;
       background-image: radial-gradient(circle, #c8c4bb 1px, transparent 1px);
       background-size: 36px 36px;
+      touch-action: none;
     }
 
     /* ── Timer ── */
@@ -83,7 +82,6 @@
       align-items: center;
       cursor: grab;
       user-select: none;
-      touch-action: none;
     }
 
     .timer.dragging { cursor: grabbing; }
@@ -538,20 +536,6 @@ function renderTimer(item) {
     e.preventDefault();
   });
 
-  // Drag — touch
-  el.addEventListener('touchstart', e => {
-    if (e.target.classList.contains('del-btn')) return;
-    const t      = e.touches[0];
-    dragging     = el;
-    item.z       = ++maxZ;
-    el.style.zIndex = maxZ;
-    el.classList.add('dragging');
-    const rect   = el.getBoundingClientRect();
-    dragOffX     = t.clientX - rect.left;
-    dragOffY     = t.clientY - rect.top;
-    e.preventDefault();
-  }, { passive: false });
-
   // Edit on double-click
   el.addEventListener('dblclick', e => {
     if (e.target.classList.contains('del-btn')) return;
@@ -603,13 +587,48 @@ function endDrag() {
 document.addEventListener('mousemove', e => applyDragMove(e.clientX, e.clientY));
 document.addEventListener('mouseup', endDrag);
 
-document.addEventListener('touchmove', e => {
-  if (!dragging) return;
+let panning = false, panStartX = 0, panStartY = 0, panScrollLeft = 0, panScrollTop = 0;
+
+document.addEventListener('touchstart', e => {
+  const timerEl = e.target.closest('.timer');
+  if (timerEl) {
+    if (e.target.classList.contains('del-btn')) return;
+    const t  = e.touches[0];
+    dragging = timerEl;
+    const id = parseInt(timerEl.dataset.id);
+    const it = items.find(i => i.id === id);
+    if (it) { it.z = ++maxZ; }
+    timerEl.style.zIndex = maxZ;
+    timerEl.classList.add('dragging');
+    const rect = timerEl.getBoundingClientRect();
+    dragOffX = t.clientX - rect.left;
+    dragOffY = t.clientY - rect.top;
+  } else {
+    panning      = true;
+    const t      = e.touches[0];
+    panStartX    = t.clientX;
+    panStartY    = t.clientY;
+    panScrollLeft = wrap.scrollLeft;
+    panScrollTop  = wrap.scrollTop;
+  }
   e.preventDefault();
-  applyDragMove(e.touches[0].clientX, e.touches[0].clientY);
 }, { passive: false });
 
-document.addEventListener('touchend', endDrag);
+document.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  if (dragging) {
+    applyDragMove(t.clientX, t.clientY);
+  } else if (panning) {
+    wrap.scrollLeft = panScrollLeft + (panStartX - t.clientX);
+    wrap.scrollTop  = panScrollTop  + (panStartY - t.clientY);
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  endDrag();
+  panning = false;
+});
 
 /* ─────────────────────────────────────────
    Modal
