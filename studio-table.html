@@ -277,31 +277,8 @@
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-/* ─────────────────────────────────────────
-   Firebase config — paste yours here
-   Get it from: Firebase console → Project
-   settings → Your apps → Config snippet
-   Leave as null to use localStorage only.
-───────────────────────────────────────── */
-const FIREBASE_CONFIG = null;
-// const FIREBASE_CONFIG = {
-//   apiKey: "...",
-//   authDomain: "...",
-//   databaseURL: "...",
-//   projectId: "...",
-//   storageBucket: "...",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
-
-let db = null;
-if (FIREBASE_CONFIG) {
-  firebase.initializeApp(FIREBASE_CONFIG);
-  db = firebase.database();
-}
+const DB_URL = 'https://josh-dashboard-7c354-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 /* ─────────────────────────────────────────
    Constants
@@ -416,24 +393,28 @@ function isoToday() { return new Date().toISOString().slice(0,10); }
    Storage
 ───────────────────────────────────────── */
 
-function save() {
+async function save() {
   const data = { items, nextId };
   localStorage.setItem('studioTable_v7', JSON.stringify(data));
-  if (db) db.ref('studio-table').set(data).catch(console.error);
+  try {
+    await fetch(`${DB_URL}/studio-table.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  } catch(e) { console.warn('Cloud save failed', e); }
 }
 
 async function load() {
-  if (db) {
-    try {
-      const snap = await db.ref('studio-table').once('value');
-      const data = snap.val();
-      if (data && data.items) {
-        items  = data.items;
-        nextId = data.nextId || 50;
-        return;
-      }
-    } catch(e) { console.warn('Firebase load failed, using localStorage', e); }
-  }
+  try {
+    const res = await fetch(`${DB_URL}/studio-table.json`);
+    const data = await res.json();
+    if (data && data.items) {
+      items  = data.items;
+      nextId = data.nextId || 50;
+      return;
+    }
+  } catch(e) { console.warn('Cloud load failed, using localStorage', e); }
   const raw = localStorage.getItem('studioTable_v7');
   if (raw) {
     const d = JSON.parse(raw);

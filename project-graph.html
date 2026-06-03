@@ -223,29 +223,8 @@
   </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-/* ── Firebase config — paste yours here ──
-   Same config as studio-table.html.
-   Leave as null to use localStorage only.
-─────────────────────────────────────── */
-const FIREBASE_CONFIG = null;
-// const FIREBASE_CONFIG = {
-//   apiKey: "...",
-//   authDomain: "...",
-//   databaseURL: "...",
-//   projectId: "...",
-//   storageBucket: "...",
-//   messagingSenderId: "...",
-//   appId: "..."
-// };
-
-let db = null;
-if (FIREBASE_CONFIG) {
-  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
-  db = firebase.database();
-}
+const DB_URL = 'https://josh-dashboard-7c354-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 /* ── Zone definitions ── */
 
@@ -446,26 +425,30 @@ let edgeSrc = null;
 
 /* ── Storage ── */
 
-function save() {
+async function save() {
   if (cy) cy.nodes().forEach(n => {
     graphData.positions[n.id()] = { x: Math.round(n.position('x')), y: Math.round(n.position('y')) };
   });
   localStorage.setItem(STORAGE_KEY, JSON.stringify(graphData));
-  if (db) db.ref('project-graph').set(graphData).catch(console.error);
+  try {
+    await fetch(`${DB_URL}/project-graph.json`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(graphData),
+    });
+  } catch(e) { console.warn('Cloud save failed', e); }
 }
 
 async function load() {
-  if (db) {
-    try {
-      const snap = await db.ref('project-graph').once('value');
-      const data = snap.val();
-      if (data && data.nodes) {
-        graphData = data;
-        ensureZones();
-        return;
-      }
-    } catch(e) { console.warn('Firebase load failed, using localStorage', e); }
-  }
+  try {
+    const res = await fetch(`${DB_URL}/project-graph.json`);
+    const data = await res.json();
+    if (data && data.nodes) {
+      graphData = data;
+      ensureZones();
+      return;
+    }
+  } catch(e) { console.warn('Cloud load failed, using localStorage', e); }
   const raw = localStorage.getItem(STORAGE_KEY);
   if (raw) {
     try {
