@@ -180,7 +180,9 @@
       background: white;
       border-radius: 10px;
       padding: 24px;
-      width: 340px;
+      width: min(340px, 92vw);
+      max-height: 85vh;
+      overflow-y: auto;
       box-shadow: 0 20px 60px rgba(0,0,0,0.2);
     }
 
@@ -694,7 +696,6 @@ function openNewModal() {
   document.getElementById('f-type').value     = 'world';
   document.getElementById('modal-delete-btn').style.display = 'none';
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-name').focus(), 50);
 }
 
 function openEditModal(item) {
@@ -708,7 +709,6 @@ function openEditModal(item) {
   document.getElementById('f-type').value     = item.type      || 'world';
   document.getElementById('modal-delete-btn').style.display = '';
   document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-name').focus(), 50);
 }
 
 function closeModal() {
