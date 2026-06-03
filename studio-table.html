@@ -277,7 +277,32 @@
   </div>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
+/* ─────────────────────────────────────────
+   Firebase config — paste yours here
+   Get it from: Firebase console → Project
+   settings → Your apps → Config snippet
+   Leave as null to use localStorage only.
+───────────────────────────────────────── */
+const FIREBASE_CONFIG = null;
+// const FIREBASE_CONFIG = {
+//   apiKey: "...",
+//   authDomain: "...",
+//   databaseURL: "...",
+//   projectId: "...",
+//   storageBucket: "...",
+//   messagingSenderId: "...",
+//   appId: "..."
+// };
+
+let db = null;
+if (FIREBASE_CONFIG) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  db = firebase.database();
+}
+
 /* ─────────────────────────────────────────
    Constants
 ───────────────────────────────────────── */
@@ -392,10 +417,23 @@ function isoToday() { return new Date().toISOString().slice(0,10); }
 ───────────────────────────────────────── */
 
 function save() {
-  localStorage.setItem('studioTable_v7', JSON.stringify({ items, nextId }));
+  const data = { items, nextId };
+  localStorage.setItem('studioTable_v7', JSON.stringify(data));
+  if (db) db.ref('studio-table').set(data).catch(console.error);
 }
 
-function load() {
+async function load() {
+  if (db) {
+    try {
+      const snap = await db.ref('studio-table').once('value');
+      const data = snap.val();
+      if (data && data.items) {
+        items  = data.items;
+        nextId = data.nextId || 50;
+        return;
+      }
+    } catch(e) { console.warn('Firebase load failed, using localStorage', e); }
+  }
   const raw = localStorage.getItem('studioTable_v7');
   if (raw) {
     const d = JSON.parse(raw);
@@ -659,10 +697,11 @@ function escHtml(s) {
    Init
 ───────────────────────────────────────── */
 
-load();
-document.getElementById('today-label').textContent =
-  new Date().toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
-items.forEach(renderTimer);
+load().then(() => {
+  document.getElementById('today-label').textContent =
+    new Date().toLocaleDateString('en-AU', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+  items.forEach(renderTimer);
+});
 </script>
 </body>
 </html>
